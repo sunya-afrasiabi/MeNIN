@@ -17,6 +17,8 @@ type World3DProps = {
   view?: 'hall' | 'vista'
   /** Homer stands on the plaza, in the world (sharing its camera, light and shadows), doing this. */
   homerAction?: HomerAction
+  /** Clicking Homer's mouth (the hall's easter egg). */
+  onHomerMouth?: () => void
 }
 
 const SKY_TOP = new THREE.Color(0x2f8fe8)
@@ -49,7 +51,7 @@ const groundHeight = (x: number, z: number) => {
 const HOMER_SPOT = new THREE.Vector3(0, 0.4, 9)
 const HOMER_SCALE = 0.86
 
-export default function World3D({ speaking = false, fallback = null, view = 'hall', homerAction }: World3DProps) {
+export default function World3D({ speaking = false, fallback = null, view = 'hall', homerAction, onHomerMouth }: World3DProps) {
   const mountRef = useRef<HTMLDivElement>(null)
   const speakingRef = useRef(speaking)
   const [failed, setFailed] = useState(false)
@@ -58,6 +60,10 @@ export default function World3D({ speaking = false, fallback = null, view = 'hal
     speakingRef.current = speaking
   }, [speaking])
   const hasHomer = homerAction !== undefined
+  const onHomerMouthRef = useRef(onHomerMouth)
+  useEffect(() => {
+    onHomerMouthRef.current = onHomerMouth
+  }, [onHomerMouth])
   const actionRef = useRef<HomerAction>(homerAction ?? 'idle')
   const actionStarted = useRef(performance.now())
   useEffect(() => {
@@ -452,7 +458,9 @@ export default function World3D({ speaking = false, fallback = null, view = 'hal
       if (!rect.width) return
       const ndc = new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1)
       raycaster.setFromCamera(ndc, camera)
-      if (raycaster.intersectObject(crowdHitbox).length) {
+      if (rig && raycaster.intersectObject(rig.mouthHitbox).length) {
+        onHomerMouthRef.current?.()
+      } else if (raycaster.intersectObject(crowdHitbox).length) {
         cheer(1.3)
       } else {
         const hit = raycaster.intersectObject(sea)[0]
@@ -573,6 +581,13 @@ export default function World3D({ speaking = false, fallback = null, view = 'hal
         set: (next: HomerAction) => {
           actionRef.current = next
           actionStarted.current = performance.now()
+        },
+        /** Where Homer's mouth is on screen (client px), for testing the easter egg's click. */
+        mouth: () => {
+          const p = new THREE.Vector3()
+          rig.mouthHitbox.getWorldPosition(p).project(camera)
+          const rect = renderer.domElement.getBoundingClientRect()
+          return { x: rect.left + ((p.x + 1) / 2) * rect.width, y: rect.top + ((1 - p.y) / 2) * rect.height }
         },
       }
     }

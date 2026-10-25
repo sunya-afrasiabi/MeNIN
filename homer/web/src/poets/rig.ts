@@ -122,6 +122,8 @@ export type RigInput = {
 
 export type PoetRig = {
   root: THREE.Group
+  /** An invisible target over the mouth and beard, for clicks (the hall's Iliad easter egg). */
+  mouthHitbox: THREE.Mesh
   update: (input: RigInput) => void
   /** True while any joint is still blending toward its target. */
   settling: () => boolean
@@ -274,6 +276,11 @@ export function createPoetRig(look: PoetLook = HOMER_LOOK, scale = 0.46): PoetRi
   mouthOpening.rotation.z = Math.PI / 2
 
   const jaw = group(headInner, [0, 1.55, 0.88])
+  // Click target: covers the mouth, moustache and beard; invisible but still hit by raycasts.
+  const mouthHitbox = new THREE.Mesh(new THREE.SphereGeometry(0.62, 16, 12), new THREE.MeshBasicMaterial({ visible: false }))
+  mouthHitbox.position.set(0, 1.62, 1.02)
+  mouthHitbox.scale.set(1.15, 0.85, 0.55)
+  headInner.add(mouthHitbox)
   if (look.beard === 'full') {
     tube([[0, 1.86, 1.105], [-0.18, 1.91, 1.105], [-0.38, 1.81, 1.06]], 0.09, hair)
     tube([[0, 1.86, 1.105], [0.18, 1.91, 1.105], [0.38, 1.81, 1.06]], 0.09, hair)
@@ -417,5 +424,5 @@ export function createPoetRig(look: PoetLook = HOMER_LOOK, scale = 0.46): PoetRi
     rightEye.scale.y = 0.145 * blink
   }
 
-  return { root, update, settling: () => keys.some((k) => Math.abs(pose[k] - target[k]) > 0.002) }
+  return { root, mouthHitbox, update, settling: () => keys.some((k) => Math.abs(pose[k] - target[k]) > 0.002) }
 }

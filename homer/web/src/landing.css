@@ -331,3 +331,9 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* The Iliad easter egg's captions: the Greek line, in a serif that carries polytonic accents. */
+.greek-line {
+  font-family: "GFS Didot", "Palatino Linotype", Palatino, Georgia, serif;
+  letter-spacing: 0.01em;
+}

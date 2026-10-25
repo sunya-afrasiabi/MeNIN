@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import ArenaPanel from './Arena'
 import Homer3D, { type HomerAction } from './Homer3D'
 import { resolveAction } from './poets/rig'
@@ -8,6 +8,8 @@ import Landing from './Landing'
 import { FIELD_EVENTS } from './lib/arena'
 import { hasTestFlight, joinCodeFromPath, TESTFLIGHT_URL } from './lib/links'
 import MusicToggle from './MusicToggle'
+import { useMusic } from './music'
+import { reciteIliad, type IliadLine, type Recital } from './poets/iliad'
 
 
 type HomerMode = 'bard' | 'judge' | 'battle'
@@ -301,7 +303,30 @@ function HomerHall({ joinCode, onBack }: { joinCode: string | null; onBack: () =
   const [activeMode, setActiveMode] = useState<HomerMode | null>(null)
   const selected = modes.find((mode) => mode.id === selectedMode)
   const onlyMode = modes.length === 1 ? modes[0] : null
+
+  // Easter egg: click Homer's mouth and he recites the Iliad's first seven lines in Greek.
+  const [recital, setRecital] = useState<{ line: IliadLine; index: number } | null>(null)
+  const [reciting, setReciting] = useState(false) // his voice (or the silent fallback) is going
+  const recitalRef = useRef<Recital | null>(null)
+  const startRecital = useCallback(() => {
+    if (recitalRef.current) return // already reciting
+    const run = reciteIliad(
+      (line, index) => setRecital(line ? { line, index } : null),
+      (speaking) => setReciting(speaking),
+    )
+    recitalRef.current = run
+    void run.done.finally(() => {
+      recitalRef.current = null
+    })
+  }, [])
+  useEffect(() => () => recitalRef.current?.stop(), [])
+  useEffect(() => {
+    if (activeMode) recitalRef.current?.stop() // leaving for the arena ends the recital
+  }, [activeMode])
+  useMusic({ duck: recital !== null })
+
   const fullMessage =
+    recital?.line.greek ??
     selected?.response ??
     'I’m Homer. I made the Iliad up out loud. Your turn.'
   const [spokenMessage, setSpokenMessage] = useState('')
@@ -318,7 +343,7 @@ function HomerHall({ joinCode, onBack }: { joinCode: string | null; onBack: () =
     return () => window.clearInterval(timer)
   }, [fullMessage])
 
-  const isSpeaking = spokenMessage.length < fullMessage.length
+  const isSpeaking = spokenMessage.length < fullMessage.length || reciting
 
   if (joinCode) {
     return (
@@ -347,7 +372,12 @@ function HomerHall({ joinCode, onBack }: { joinCode: string | null; onBack: () =
     <main className="scene">
       <div className="animated-background" aria-hidden="true">
         {/* Homer stands inside the world, on the plaza: one camera, one light, real shadows. */}
-        <World3D speaking={isSpeaking} homerAction={resolveAction(selectedMode)} fallback={<div className="scene-artboard"><AegeanScene /></div>} />
+        <World3D
+          speaking={isSpeaking}
+          homerAction={recital ? 'sing' : resolveAction(selectedMode)}
+          onHomerMouth={startRecital}
+          fallback={<div className="scene-artboard"><AegeanScene /></div>}
+        />
       </div>
 
       <MusicToggle className="floating" />
@@ -362,8 +392,10 @@ function HomerHall({ joinCode, onBack }: { joinCode: string | null; onBack: () =
 
       <section className={`dialogue${onlyMode ? ' single-path' : ''}`} aria-labelledby="dialogue-title">
         <div className="dialogue-copy">
-          <p className="welcome">{selected ? selected.label : 'Homer speaks'}</p>
-          <h1 id="dialogue-title">{spokenMessage}<span className="typing-cursor" /></h1>
+          <p className="welcome">{recital ? `Iliad 1.${recital.index + 1}` : selected ? selected.label : 'Homer speaks'}</p>
+          <h1 id="dialogue-title" lang={recital ? 'grc' : undefined} className={recital ? 'greek-line' : undefined}>
+            {spokenMessage}<span className="typing-cursor" />
+          </h1>
         </div>
 
         {/* One path: a direct button, no dropdown. The dropdown comes back once there are more. */}
